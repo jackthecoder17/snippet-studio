@@ -4,7 +4,7 @@
 
 Paste your code, pick a theme and a background, and export a sharp PNG or copy it straight to your clipboard. It's free, has no sign-up and no watermark, and runs entirely in your browser. Your code never leaves your machine.
 
-**▶ Use it:** https://jackthecoder17.github.io/snippet-studio/
+**▶ Use it:** https://snippet-studio-sigma.vercel.app
 
 Built with **Next.js**, **TypeScript**, **Tailwind CSS** and **shadcn/ui**.
 
@@ -73,7 +73,9 @@ Then open http://localhost:3000.
 
 ## Deploy
 
-`npm run build` writes a static site to `out/`. Pushing to `main` runs the GitHub Actions workflow in `.github/workflows/deploy.yml`, which builds with `BASE_PATH=/snippet-studio` and publishes to GitHub Pages. To host it somewhere else at the root of a domain (Vercel, Netlify, Cloudflare Pages), build without `BASE_PATH`.
+Hosted on [Vercel](https://vercel.com). The GitHub repo is connected, so every push to `main` deploys to production and every pull request gets its own preview link.
+
+To deploy your own copy, fork the repo and import it at [vercel.com/new](https://vercel.com/new). No settings are needed. The app builds as a static site (`output: "export"`), so `npm run build` also writes plain files to `out/` that you can host anywhere. Set `BASE_PATH` (for example `/snippet-studio`) if you serve it from a subfolder, like GitHub Pages does.
 
 ## Customise it
 
