@@ -1,0 +1,531 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Turn code into clean, shareable images for LinkedIn, Twitter and your docs. Free, no sign-up, runs entirely in your browser.">
+<title>Snippet Studio</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" crossorigin="anonymous" href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&family=JetBrains+Mono:wght@400;600&family=Fira+Code:wght@400;600&family=IBM+Plex+Mono:wght@400;600&family=Source+Code+Pro:wght@400;600&display=swap">
+<style>
+  /* Layout: top bar, a stage that shows the snippet exactly as it will export, and a control rail
+     (right side on desktop, stacked under the stage on phones). */
+  :root {
+    --bg: #eef0f4;
+    --panel: #ffffff;
+    --fg: #16181d;
+    --muted: #5f6675;
+    --line: #dde1e8;
+    --accent: #d9480f;
+    --accent-fg: #ffffff;
+    --checker: #e3e6ec;
+    --ui: "Onest", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #111216; --panel: #1a1c22; --fg: #eceef3; --muted: #9299a8; --line: #2b2e38;
+      --accent: #ff7a45; --accent-fg: #1a0d06; --checker: #1e2027; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #111216; --panel: #1a1c22; --fg: #eceef3; --muted: #9299a8; --line: #2b2e38;
+    --accent: #ff7a45; --accent-fg: #1a0d06; --checker: #1e2027; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: var(--bg); color: var(--fg);
+    font: 14px/1.45 var(--ui);
+    display: grid; grid-template-rows: auto 1fr;
+  }
+
+  /* Top bar */
+  .bar {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    padding: calc(env(safe-area-inset-top, 0px) + 12px) 20px 12px;
+    border-bottom: 1px solid var(--line); background: var(--panel);
+  }
+  .brand { display: flex; align-items: baseline; gap: 10px; margin-right: auto; }
+  .brand b { font-size: 17px; font-weight: 700; letter-spacing: -0.01em; }
+  .brand b i { font-style: normal; color: var(--accent); }
+  .brand span { color: var(--muted); font-size: 13px; }
+  .btn {
+    font: 600 13px var(--ui); cursor: pointer;
+    border: 1px solid var(--line); background: var(--panel); color: var(--fg);
+    border-radius: 8px; padding: 8px 14px;
+    display: inline-flex; align-items: center; gap: 8px;
+  }
+  .btn:hover { border-color: var(--muted); }
+  .btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+  .btn.primary:hover { filter: brightness(1.06); }
+  .btn:focus-visible, .ctl:focus-visible, .chip:focus-visible, .swatch:focus-visible {
+    outline: 2px solid var(--accent); outline-offset: 2px;
+  }
+  kbd { font: 11px var(--mono); opacity: 0.7; }
+
+  /* Main */
+  .main { display: grid; grid-template-columns: minmax(0, 1fr) 300px; min-height: 0; }
+  .stage {
+    overflow: auto; min-width: 0;
+    display: grid; place-items: center;
+    padding: 40px 24px;
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--checker) 1px, transparent 1px);
+    background-size: 18px 18px;
+  }
+  .rail {
+    border-left: 1px solid var(--line); background: var(--panel);
+    overflow-y: auto; padding: 18px 18px 28px;
+    display: flex; flex-direction: column; gap: 20px;
+  }
+  .group { display: flex; flex-direction: column; gap: 8px; }
+  .label {
+    font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted);
+    display: flex; justify-content: space-between;
+  }
+  .label output { font-variant-numeric: tabular-nums; letter-spacing: 0; text-transform: none; color: var(--fg); }
+  .row { display: flex; gap: 6px; flex-wrap: wrap; }
+  .ctl {
+    width: 100%; font: 500 13px var(--ui); color: var(--fg);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px;
+  }
+  input[type="range"] { width: 100%; accent-color: var(--accent); }
+  .chip {
+    font: 500 12px var(--ui); cursor: pointer; color: var(--fg);
+    background: var(--bg); border: 1px solid var(--line); border-radius: 999px; padding: 6px 11px;
+  }
+  .chip[aria-pressed="true"] { background: var(--fg); color: var(--panel); border-color: var(--fg); }
+  .swatches { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; }
+  .swatch {
+    aspect-ratio: 1; border-radius: 10px; cursor: pointer; padding: 0;
+    border: 2px solid transparent; box-shadow: inset 0 0 0 1px rgba(0,0,0,0.08);
+  }
+  .swatch[aria-pressed="true"] { border-color: var(--fg); }
+  .swatch.none {
+    background: repeating-conic-gradient(#d0d4db 0% 25%, #ffffff 0% 50%) 50% / 12px 12px;
+  }
+  .toggle { display: flex; align-items: center; justify-content: space-between; gap: 10px; cursor: pointer; }
+  .toggle input { accent-color: var(--accent); width: 16px; height: 16px; }
+  .tip { color: var(--muted); font-size: 12px; line-height: 1.5; }
+
+  /* ---------- The exported frame ---------- */
+  .frame {
+    display: flex; align-items: center; justify-content: center;
+    padding: var(--pad, 56px);
+    background: var(--frame-bg);
+    flex: none;
+  }
+  .window {
+    background: var(--w-bg); color: var(--w-fg);
+    border-radius: 12px;
+    box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 24px 60px -12px rgba(0,0,0,0.45), 0 8px 20px -8px rgba(0,0,0,0.3);
+    min-width: 440px; max-width: 1100px;
+    overflow: hidden;
+  }
+  .window.shadowless { box-shadow: none; }
+  .titlebar {
+    display: grid; grid-template-columns: 60px 1fr 60px; align-items: center;
+    padding: 14px 16px 4px;
+  }
+  .lights { display: flex; gap: 8px; }
+  .lights i { width: 12px; height: 12px; border-radius: 50%; display: block; }
+  .lights i:nth-child(1) { background: #ff5f57; }
+  .lights i:nth-child(2) { background: #febc2e; }
+  .lights i:nth-child(3) { background: #28c840; }
+  .filename {
+    text-align: center; font: 500 13px var(--ui); color: var(--w-muted);
+    background: transparent; border: 0; outline: none; width: 100%; padding: 2px 0;
+  }
+  .code {
+    display: grid; grid-template-columns: auto 1fr;
+    padding: 14px 24px 22px 18px;
+    font-family: var(--code-font);
+    font-size: var(--fs, 15px); line-height: 1.6;
+  }
+  .gutter {
+    color: var(--w-muted); opacity: 0.55; text-align: right;
+    padding-right: 18px; user-select: none; white-space: pre;
+  }
+  .gutter.off { display: none; }
+  .editor { position: relative; min-width: 0; }
+  .editor pre, .editor textarea {
+    margin: 0; padding: 0; border: 0;
+    font: inherit; line-height: inherit; letter-spacing: 0;
+    white-space: pre; tab-size: 2; overflow: hidden;
+  }
+  .editor pre { color: var(--w-fg); pointer-events: none; }
+  .editor textarea {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    background: transparent; color: transparent; caret-color: var(--w-fg);
+    resize: none; outline: none;
+  }
+  .editor textarea::selection { background: var(--w-sel); color: transparent; }
+
+  /* Syntax tokens (highlight.js classes) */
+  .hljs-comment, .hljs-quote { color: var(--t-comment); font-style: italic; }
+  .hljs-keyword, .hljs-selector-tag, .hljs-meta .hljs-keyword, .hljs-doctag { color: var(--t-keyword); }
+  .hljs-string, .hljs-regexp, .hljs-template-string, .hljs-meta .hljs-string { color: var(--t-string); }
+  .hljs-number, .hljs-literal, .hljs-symbol, .hljs-bullet { color: var(--t-number); }
+  .hljs-title, .hljs-title.function_, .hljs-section { color: var(--t-func); }
+  .hljs-title.class_, .hljs-type, .hljs-built_in, .hljs-selector-class { color: var(--t-type); }
+  .hljs-attr, .hljs-attribute, .hljs-variable, .hljs-template-variable, .hljs-property, .hljs-selector-id { color: var(--t-attr); }
+  .hljs-params { color: var(--w-fg); }
+  .hljs-tag, .hljs-name, .hljs-meta { color: var(--t-keyword); }
+  .hljs-subst { color: var(--w-fg); }
+  .hljs-deletion { color: #ff6b6b; }
+  .hljs-addition { color: #69db7c; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom, 0px) + 24px);
+    transform: translateX(-50%) translateY(20px); opacity: 0;
+    background: var(--fg); color: var(--panel); font-weight: 600;
+    padding: 10px 16px; border-radius: 10px; transition: 0.2s ease; pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+  @media (max-width: 860px) {
+    body { height: auto; }
+    .main { grid-template-columns: minmax(0, 1fr); }
+    .rail { border-left: 0; border-top: 1px solid var(--line); }
+    .stage { padding: 24px 16px; place-items: start; }
+    .brand span { display: none; }
+    .window { min-width: 300px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .toast { transition: none; } }
+</style>
+</head>
+<body>
+
+<header class="bar">
+  <div class="brand"><b>Snippet<i>.</i>Studio</b><span>Code screenshots for your next post</span></div>
+  <button class="btn" id="copy" type="button">Copy image <kbd>⇧⌘C</kbd></button>
+  <button class="btn primary" id="export" type="button">Export PNG <kbd>⌘S</kbd></button>
+</header>
+
+<div class="main">
+  <section class="stage" id="stage" aria-label="Preview">
+    <div class="frame" id="frame">
+      <div class="window" id="window">
+        <div class="titlebar">
+          <div class="lights" aria-hidden="true"><i></i><i></i><i></i></div>
+          <input class="filename" id="filename" value="debounce.ts" aria-label="File name" spellcheck="false">
+          <span></span>
+        </div>
+        <div class="code">
+          <div class="gutter" id="gutter" aria-hidden="true"></div>
+          <div class="editor">
+            <pre><code id="hl"></code></pre>
+            <textarea id="src" spellcheck="false" autocapitalize="off" autocomplete="off" aria-label="Code"></textarea>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <aside class="rail" aria-label="Settings">
+    <div class="group">
+      <div class="label">Language</div>
+      <select class="ctl" id="lang"></select>
+    </div>
+
+    <div class="group">
+      <div class="label">Theme</div>
+      <div class="row" id="themes"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Background</div>
+      <div class="swatches" id="bgs"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Size for</div>
+      <div class="row" id="ratios"></div>
+    </div>
+
+    <div class="group">
+      <div class="label">Font</div>
+      <select class="ctl" id="font">
+        <option value='"JetBrains Mono"'>JetBrains Mono</option>
+        <option value='"Fira Code"'>Fira Code</option>
+        <option value='"IBM Plex Mono"'>IBM Plex Mono</option>
+        <option value='"Source Code Pro"'>Source Code Pro</option>
+      </select>
+    </div>
+
+    <div class="group">
+      <div class="label"><label for="fs">Font size</label><output id="fsOut">15px</output></div>
+      <input type="range" id="fs" min="11" max="24" value="15">
+    </div>
+
+    <div class="group">
+      <div class="label"><label for="pad">Padding</label><output id="padOut">56px</output></div>
+      <input type="range" id="pad" min="0" max="128" step="8" value="56">
+    </div>
+
+    <div class="group">
+      <div class="label">Export scale</div>
+      <div class="row" id="scales"></div>
+    </div>
+
+    <div class="group">
+      <label class="toggle"><span>Line numbers</span><input type="checkbox" id="lines" checked></label>
+      <label class="toggle"><span>Window shadow</span><input type="checkbox" id="shadow" checked></label>
+    </div>
+
+    <p class="tip">Click the code to edit it, or paste your own. The file name is editable too. Nothing leaves your browser.</p>
+  </aside>
+</div>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+<script>
+(() => {
+  const SAMPLE = `// Wait until the user stops typing before firing
+export function debounce<T extends (...args: any[]) => void>(
+  fn: T,
+  delay = 300
+) {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  return (...args: Parameters<T>) => {
+    clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), delay);
+  };
+}
+
+const search = debounce((q: string) => fetchResults(q), 250);`;
+
+  const THEMES = {
+    Midnight: { bg: "#0f1420", fg: "#d6deeb", muted: "#8b98ad", sel: "rgba(130,170,255,0.25)",
+      comment: "#637777", keyword: "#c792ea", string: "#addb67", number: "#f78c6c", func: "#82aaff", type: "#ffcb8b", attr: "#7fdbca" },
+    Neon:     { bg: "#1e1b2e", fg: "#f8f8f2", muted: "#9a94c0", sel: "rgba(255,121,198,0.25)",
+      comment: "#6c75a8", keyword: "#ff79c6", string: "#f1fa8c", number: "#bd93f9", func: "#50fa7b", type: "#8be9fd", attr: "#ffb86c" },
+    Ember:    { bg: "#1c1512", fg: "#eadbc8", muted: "#a08b7a", sel: "rgba(255,122,89,0.25)",
+      comment: "#806c5d", keyword: "#ff7a59", string: "#c3d98a", number: "#f5b86b", func: "#ffd27a", type: "#f59f8b", attr: "#e7c3a0" },
+    Paper:    { bg: "#fbfaf7", fg: "#2b2d33", muted: "#8a8d96", sel: "rgba(64,120,242,0.18)",
+      comment: "#a0a1a7", keyword: "#a626a4", string: "#50a14f", number: "#986801", func: "#4078f2", type: "#c18401", attr: "#e45649" },
+  };
+
+  const BGS = [
+    "linear-gradient(135deg, #ff9a5a 0%, #ff5e62 50%, #c2185b 100%)",
+    "linear-gradient(135deg, #43cea2 0%, #185a9d 100%)",
+    "linear-gradient(135deg, #f7d774 0%, #f28a3b 100%)",
+    "linear-gradient(140deg, #a1c4fd 0%, #c2e9fb 100%)",
+    "radial-gradient(120% 120% at 0% 0%, #5b247a 0%, #1bcedf 100%)",
+    "linear-gradient(135deg, #232526 0%, #414345 100%)",
+    "linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)",
+    "linear-gradient(135deg, #0f2027 0%, #2c5364 100%)",
+    "#f4f1ec",
+    "transparent",
+  ];
+
+  const RATIOS = [
+    { label: "Auto", r: 0 },
+    { label: "Twitter 16:9", r: 16 / 9 },
+    { label: "LinkedIn 1:1", r: 1 },
+    { label: "Portrait 4:5", r: 4 / 5 },
+  ];
+
+  const LANGS = [
+    ["auto", "Auto-detect"], ["typescript", "TypeScript"], ["javascript", "JavaScript"], ["python", "Python"],
+    ["go", "Go"], ["rust", "Rust"], ["java", "Java"], ["kotlin", "Kotlin"], ["swift", "Swift"],
+    ["cpp", "C++"], ["csharp", "C#"], ["php", "PHP"], ["ruby", "Ruby"], ["sql", "SQL"],
+    ["bash", "Shell"], ["xml", "HTML / XML"], ["css", "CSS"], ["json", "JSON"], ["yaml", "YAML"], ["markdown", "Markdown"],
+  ];
+
+  const $ = id => document.getElementById(id);
+  const src = $("src"), hl = $("hl"), gutter = $("gutter"), frame = $("frame"), win = $("window");
+  const state = { theme: "Midnight", bg: 0, ratio: 0, scale: 2, lang: "auto" };
+
+  // Restore last settings (convenience only)
+  try { Object.assign(state, JSON.parse(localStorage.getItem("snippet-studio") || "{}")); } catch {}
+  const save = () => { try { localStorage.setItem("snippet-studio", JSON.stringify(state)); } catch {} };
+
+  // ---- Controls ----
+  const langSel = $("lang");
+  LANGS.forEach(([v, l]) => langSel.add(new Option(l, v)));
+  langSel.value = state.lang;
+
+  function chips(container, items, key, render) {
+    container.innerHTML = "";
+    items.forEach((item, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "chip"; b.id = `${key}-${i}`;
+      b.textContent = item.label;
+      b.setAttribute("aria-pressed", String(state[key] === item.value));
+      b.onclick = () => { state[key] = item.value; save(); render(); };
+      container.appendChild(b);
+    });
+  }
+
+  function renderControls() {
+    chips($("themes"), Object.keys(THEMES).map(k => ({ label: k, value: k })), "theme", renderAll);
+    chips($("ratios"), RATIOS.map((r, i) => ({ label: r.label, value: i })), "ratio", renderAll);
+    chips($("scales"), [1, 2, 3].map(s => ({ label: s + "×", value: s })), "scale", renderAll);
+    const bgs = $("bgs"); bgs.innerHTML = "";
+    BGS.forEach((bg, i) => {
+      const b = document.createElement("button");
+      b.type = "button"; b.className = "swatch" + (bg === "transparent" ? " none" : ""); b.id = "bg-" + i;
+      if (bg !== "transparent") b.style.background = bg;
+      b.setAttribute("aria-label", bg === "transparent" ? "No background" : "Background " + (i + 1));
+      b.setAttribute("aria-pressed", String(state.bg === i));
+      b.onclick = () => { state.bg = i; save(); renderAll(); };
+      bgs.appendChild(b);
+    });
+  }
+
+  // ---- Rendering ----
+  function highlight() {
+    const code = src.value;
+    let result;
+    try {
+      result = state.lang === "auto"
+        ? hljs.highlightAuto(code)
+        : hljs.highlight(code, { language: state.lang, ignoreIllegals: true });
+    } catch { result = { value: escapeHtml(code) }; }
+    // A trailing newline needs a visible character or the pre collapses that last line.
+    hl.innerHTML = result.value + (code.endsWith("\n") || code === "" ? " " : "");
+    const n = code.split("\n").length;
+    gutter.textContent = Array.from({ length: n }, (_, i) => i + 1).join("\n");
+    fitFrame();
+  }
+
+  function escapeHtml(s) { return s.replace(/[&<>]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+
+  function applyTheme() {
+    const t = THEMES[state.theme] || THEMES.Midnight;
+    const s = win.style;
+    s.setProperty("--w-bg", t.bg); s.setProperty("--w-fg", t.fg);
+    s.setProperty("--w-muted", t.muted); s.setProperty("--w-sel", t.sel);
+    ["comment", "keyword", "string", "number", "func", "type", "attr"].forEach(k => s.setProperty("--t-" + k, t[k]));
+    frame.style.setProperty("--frame-bg", BGS[state.bg] ?? BGS[0]);
+  }
+
+  // Grow the frame on one axis so it hits the chosen aspect ratio, keeping the window centred.
+  function fitFrame() {
+    frame.style.width = ""; frame.style.height = "";
+    const r = RATIOS[state.ratio]?.r || 0;
+    if (!r) return;
+    const w = frame.offsetWidth, h = frame.offsetHeight;
+    if (w / h < r) frame.style.width = Math.ceil(h * r) + "px";
+    else frame.style.height = Math.ceil(w / r) + "px";
+  }
+
+  function renderAll() {
+    renderControls();
+    applyTheme();
+    highlight();
+  }
+
+  // ---- Inputs ----
+  src.value = SAMPLE;
+  src.addEventListener("input", highlight);
+  src.addEventListener("keydown", e => {
+    if (e.key === "Tab") {
+      e.preventDefault();
+      const { selectionStart: a, selectionEnd: b } = src;
+      src.setRangeText("  ", a, b, "end");
+      highlight();
+    }
+  });
+  langSel.addEventListener("change", () => { state.lang = langSel.value; save(); highlight(); });
+
+  const fontSel = $("font");
+  if (state.font) fontSel.value = state.font;
+  const setFont = () => { frame.style.setProperty("--code-font", `${fontSel.value}, ui-monospace, Menlo, monospace`); };
+  fontSel.addEventListener("change", () => { state.font = fontSel.value; save(); setFont(); document.fonts.ready.then(fitFrame); });
+
+  function bindRange(id, prop, unit, key) {
+    const el = $(id), out = $(id + "Out");
+    if (state[key] != null) el.value = state[key];
+    const apply = () => {
+      frame.style.setProperty(prop, el.value + unit);
+      out.textContent = el.value + unit;
+      fitFrame();
+    };
+    el.addEventListener("input", () => { state[key] = el.value; save(); apply(); });
+    apply();
+  }
+
+  const lines = $("lines"), shadow = $("shadow");
+  if (state.lines === false) lines.checked = false;
+  if (state.shadow === false) shadow.checked = false;
+  const applyToggles = () => {
+    gutter.classList.toggle("off", !lines.checked);
+    win.classList.toggle("shadowless", !shadow.checked);
+    fitFrame();
+  };
+  lines.addEventListener("change", () => { state.lines = lines.checked; save(); applyToggles(); });
+  shadow.addEventListener("change", () => { state.shadow = shadow.checked; save(); applyToggles(); });
+
+  // ---- Export ----
+  const toast = msg => {
+    const t = $("toast"); t.textContent = msg; t.classList.add("show");
+    clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), 2200);
+  };
+
+  async function render() {
+    await document.fonts.ready;
+    src.blur();
+    return htmlToImage.toBlob(frame, {
+      pixelRatio: state.scale,
+      filter: node => node.tagName !== "TEXTAREA",
+      cacheBust: false,
+    });
+  }
+
+  function fileBase() {
+    return ($("filename").value.trim() || "snippet").replace(/\.[^.]+$/, "").replace(/[^\w-]+/g, "-") || "snippet";
+  }
+
+  async function exportPng() {
+    try {
+      const blob = await render();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = `${fileBase()}.png`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      toast(`Saved ${fileBase()}.png`);
+    } catch (err) {
+      console.error(err);
+      toast("Export failed. Try a different background or reload the page.");
+    }
+  }
+
+  async function copyPng() {
+    try {
+      if (!window.ClipboardItem) throw new Error("no clipboard");
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": render() })]);
+      toast("Image copied. Paste it straight into your post.");
+    } catch (err) {
+      console.error(err);
+      toast("This browser can't copy images. Use Export PNG instead.");
+    }
+  }
+
+  $("export").onclick = exportPng;
+  $("copy").onclick = copyPng;
+  window.addEventListener("keydown", e => {
+    const mod = e.metaKey || e.ctrlKey;
+    if (mod && e.key.toLowerCase() === "s") { e.preventDefault(); exportPng(); }
+    if (mod && e.shiftKey && e.key.toLowerCase() === "c") { e.preventDefault(); copyPng(); }
+  });
+
+  // ---- Boot ----
+  setFont();
+  bindRange("fs", "--fs", "px", "fs");
+  bindRange("pad", "--pad", "px", "pad");
+  applyToggles();
+  renderAll();
+  document.fonts.ready.then(fitFrame);
+})();
+</script>
+</body>
+</html>
